@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Snakes & Ladders – Metronome</title>
+<style>
+  body { margin:0; font-family:system-ui,sans-serif; background:#0f172a; color:#e5e7eb; display:flex; justify-content:center; }
+  .app { width:100%; max-width:420px; padding:12px; }
+  h1 { text-align:center; margin:8px 0 12px; }
+  .board { display:grid; grid-template-columns:repeat(10,1fr); aspect-ratio:1/1; background:#020617; border-radius:12px; overflow:hidden; box-shadow:0 20px 40px rgba(0,0,0,.6); }
+  .cell { border:1px solid #1f2937; font-size:.6rem; display:flex; align-items:flex-end; justify-content:flex-end; padding:2px; position:relative; }
+  .cell span { opacity:.6; }
+  .player { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.2rem; }
+  .snake { background:rgba(239,68,68,.15); }
+  .ladder { background:rgba(34,197,94,.15); }
+  .panel { margin-top:12px; background:#020617; border-radius:12px; padding:12px; box-shadow:0 20px 40px rgba(0,0,0,.6); }
+  .status { text-align:center; font-size:1rem; margin-bottom:8px; }
+  button { width:100%; padding:12px; border-radius:999px; border:none; background:#1d4ed8; color:#fff; font-size:1rem; font-weight:600; margin-top:8px; }
+  button:disabled { opacity:.5; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Snakes & Ladders</h1>
+  <div id="board" class="board"></div>
+
+  <div class="panel">
+    <div id="status" class="status">Square 1</div>
+    <button id="rollBtn">Roll Dice</button>
+  </div>
+</div>
+
+<script>
+const boardEl = document.getElementById('board');
+const statusEl = document.getElementById('status');
+const rollBtn = document.getElementById('rollBtn');
+
+let position = 1;
+let ticking = false;
+let metroTimer = null;
+
+// Simple snakes & ladders map
+const snakes = { 16:6, 48:30, 62:19, 88:24 };
+const ladders = { 3:22, 8:26, 20:41, 36:55, 57:76 };
+
+function buildBoard() {
+  boardEl.innerHTML = '';
+  for (let i=100;i>=1;i--) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    if (snakes[i]) cell.classList.add('snake');
+    if (ladders[i]) cell.classList.add('ladder');
+    const num = document.createElement('span');
+    num.textContent = i;
+    cell.appendChild(num);
+    if (i === position) {
+      const p = document.createElement('div');
+      p.className = 'player';
+      p.textContent = '●';
+      cell.appendChild(p);
+    }
+    boardEl.appendChild(cell);
+  }
+}
+
+function beep(freq, duration) {
+  const ctx = new (window.AudioContext||window.webkitAudioContext)();
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.frequency.value = freq;
+  o.type = 'sine';
+  g.gain.value = .2;
+  o.connect(g).connect(ctx.destination);
+  o.start();
+  o.stop(ctx.currentTime + duration);
+}
+
+function startMetronome() {
+  const speed = Math.max(200, 1200 - position * 8); // higher square = faster
+  const duration = 4000 + Math.random()*6000; // 4–10s
+  ticking = true;
+  statusEl.textContent = `Square ${position} – focus...`;
+  metroTimer = setInterval(() => beep(800,0.05), speed);
+  setTimeout(() => {
+    clearInterval(metroTimer);
+    ticking = false;
+    statusEl.textContent = `Square ${position}`;
+    rollBtn.disabled = false;
+  }, duration);
+}
+
+rollBtn.onclick = () => {
+  if (ticking) return;
+  rollBtn.disabled = true;
+  const roll = 1 + Math.floor(Math.random()*6);
+  position = Math.min(100, position + roll);
+  if (snakes[position]) position = snakes[position];
+  if (ladders[position]) position = ladders[position];
+  buildBoard();
+  if (position >= 100) {
+    statusEl.textContent = 'You made it to 100!';
+    rollBtn.disabled = true;
+    return;
+  }
+  startMetronome();
+};
+
+buildBoard();
+</script>
+</body>
+</html>
