@@ -1,112 +1,198 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Snakes & Ladders – Metronome</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Metronome Ladder Game</title>
+
 <style>
-  body { margin:0; font-family:system-ui,sans-serif; background:#0f172a; color:#e5e7eb; display:flex; justify-content:center; }
-  .app { width:100%; max-width:420px; padding:12px; }
-  h1 { text-align:center; margin:8px 0 12px; }
-  .board { display:grid; grid-template-columns:repeat(10,1fr); aspect-ratio:1/1; background:#020617; border-radius:12px; overflow:hidden; box-shadow:0 20px 40px rgba(0,0,0,.6); }
-  .cell { border:1px solid #1f2937; font-size:.6rem; display:flex; align-items:flex-end; justify-content:flex-end; padding:2px; position:relative; }
-  .cell span { opacity:.6; }
-  .player { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.2rem; }
-  .snake { background:rgba(239,68,68,.15); }
-  .ladder { background:rgba(34,197,94,.15); }
-  .panel { margin-top:12px; background:#020617; border-radius:12px; padding:12px; box-shadow:0 20px 40px rgba(0,0,0,.6); }
-  .status { text-align:center; font-size:1rem; margin-bottom:8px; }
-  button { width:100%; padding:12px; border-radius:999px; border:none; background:#1d4ed8; color:#fff; font-size:1rem; font-weight:600; margin-top:8px; }
-  button:disabled { opacity:.5; }
+body{
+  font-family: system-ui, sans-serif;
+  background:#0f172a;
+  color:#e5e7eb;
+  display:flex;
+  justify-content:center;
+  padding:20px;
+}
+.panel{
+  background:#020617;
+  padding:20px;
+  border-radius:16px;
+  width:380px;
+  max-width:95vw;
+  box-shadow:0 20px 40px rgba(0,0,0,.6);
+}
+h1{text-align:center;margin-top:0;}
+.stat{
+  display:flex;
+  justify-content:space-between;
+  margin:6px 0;
+  font-weight:600;
+}
+input{
+  width:100%;
+  padding:10px;
+  border-radius:10px;
+  border:none;
+  margin-bottom:10px;
+}
+button{
+  width:100%;
+  padding:14px;
+  border-radius:999px;
+  border:none;
+  background:#1d4ed8;
+  color:white;
+  font-size:1rem;
+  font-weight:700;
+  cursor:pointer;
+}
+button:disabled{opacity:.5;}
+#imageBox{
+  margin-top:14px;
+  border-radius:12px;
+  overflow:hidden;
+  display:none;
+}
+#imageBox img{
+  width:100%;
+}
+#status{
+  text-align:center;
+  margin-top:10px;
+  min-height:24px;
+  font-weight:600;
+}
 </style>
 </head>
-<body>
-<div class="app">
-  <h1>Snakes & Ladders</h1>
-  <div id="board" class="board"></div>
 
-  <div class="panel">
-    <div id="status" class="status">Square 1</div>
-    <button id="rollBtn">Roll Dice</button>
-  </div>
+<body>
+<div class="panel">
+  <h1>Snakes & Tempo</h1>
+
+  <input id="subredditInput" placeholder="Enter subreddit (e.g. gifs)" />
+
+  <div class="stat"><span>Square</span><span id="square">1</span></div>
+  <div class="stat"><span>Last Roll</span><span id="roll">–</span></div>
+  <div class="stat"><span>Metronome</span><span id="bpm">–</span></div>
+
+  <button id="rollBtn">Roll Dice</button>
+
+  <div id="imageBox"><img id="img"></div>
+  <div id="status"></div>
 </div>
 
 <script>
-const boardEl = document.getElementById('board');
-const statusEl = document.getElementById('status');
-const rollBtn = document.getElementById('rollBtn');
-
-let position = 1;
-let ticking = false;
-let metroTimer = null;
-
-// Simple snakes & ladders map
-const snakes = { 16:6, 48:30, 62:19, 88:24 };
-const ladders = { 3:22, 8:26, 20:41, 36:55, 57:76 };
-
-function buildBoard() {
-  boardEl.innerHTML = '';
-  for (let i=100;i>=1;i--) {
-    const cell = document.createElement('div');
-    cell.className = 'cell';
-    if (snakes[i]) cell.classList.add('snake');
-    if (ladders[i]) cell.classList.add('ladder');
-    const num = document.createElement('span');
-    num.textContent = i;
-    cell.appendChild(num);
-    if (i === position) {
-      const p = document.createElement('div');
-      p.className = 'player';
-      p.textContent = '●';
-      cell.appendChild(p);
-    }
-    boardEl.appendChild(cell);
+/* ========= AUDIO ========= */
+let audioCtx;
+function initAudio(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
   }
 }
-
-function beep(freq, duration) {
-  const ctx = new (window.AudioContext||window.webkitAudioContext)();
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.frequency.value = freq;
-  o.type = 'sine';
-  g.gain.value = .2;
-  o.connect(g).connect(ctx.destination);
+function clickSound(){
+  initAudio();
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = "square";
+  o.frequency.value = 800;
+  g.gain.value = 0.15;
+  o.connect(g).connect(audioCtx.destination);
   o.start();
-  o.stop(ctx.currentTime + duration);
+  o.stop(audioCtx.currentTime + 0.05);
 }
 
-function startMetronome() {
-  const speed = Math.max(200, 1200 - position * 8); // higher square = faster
-  const duration = 4000 + Math.random()*6000; // 4–10s
-  ticking = true;
-  statusEl.textContent = `Square ${position} – focus...`;
-  metroTimer = setInterval(() => beep(800,0.05), speed);
-  setTimeout(() => {
-    clearInterval(metroTimer);
-    ticking = false;
-    statusEl.textContent = `Square ${position}`;
-    rollBtn.disabled = false;
-  }, duration);
-}
+/* ========= GAME STATE ========= */
+let position = 1;
+let locked = false;
+let metroTimer, stopTimer;
 
-rollBtn.onclick = () => {
-  if (ticking) return;
-  rollBtn.disabled = true;
-  const roll = 1 + Math.floor(Math.random()*6);
-  position = Math.min(100, position + roll);
-  if (snakes[position]) position = snakes[position];
-  if (ladders[position]) position = ladders[position];
-  buildBoard();
-  if (position >= 100) {
-    statusEl.textContent = 'You made it to 100!';
-    rollBtn.disabled = true;
-    return;
-  }
-  startMetronome();
+/* ========= SNAKES & LADDERS ========= */
+const jumps = {
+  4:14, 9:31, 17:7, 20:38, 28:84,
+  40:59, 51:67, 54:34, 62:19,
+  64:81, 71:91, 87:24, 93:73, 95:75, 99:78
 };
 
-buildBoard();
+/* ========= BPM RANGES ========= */
+function bpmForSquare(n){
+  if(n<=10) return rand(1,2);
+  if(n<=20) return rand(2,3);
+  if(n<=30) return rand(2,4);
+  if(n<=40) return rand(3,4);
+  if(n<=50) return rand(3,5);
+  if(n<=60) return rand(4,5);
+  if(n<=70) return rand(4,6);
+  if(n<=80) return rand(5,6);
+  if(n<=90) return rand(5,6);
+  return 6;
+}
+
+function rand(min,max){
+  return Math.floor(Math.random()*(max-min+1))+min;
+}
+
+/* ========= REDDIT IMAGE ========= */
+async function fetchImage(sub){
+  try{
+    const url = `https://corsproxy.io/?https://www.reddit.com/r/${sub}/hot.json?limit=50`;
+    const r = await fetch(url);
+    const j = await r.json();
+    const posts = j.data.children
+      .map(p=>p.data)
+      .filter(p=>p.url && (p.url.endsWith(".jpg")||p.url.endsWith(".png")||p.url.endsWith(".gif")));
+    if(posts.length===0) return null;
+    return posts[Math.floor(Math.random()*posts.length)].url;
+  }catch{
+    return null;
+  }
+}
+
+/* ========= TURN LOGIC ========= */
+rollBtn.onclick = async ()=>{
+  initAudio();
+  if(locked) return;
+
+  locked = true;
+  rollBtn.disabled = true;
+
+  const die = rand(1,6);
+  roll.textContent = die;
+
+  position += die;
+  if(position>100) position = 100;
+
+  if(jumps[position]){
+    position = jumps[position];
+  }
+
+  square.textContent = position;
+
+  const bpmVal = bpmForSquare(position);
+  bpm.textContent = bpmVal + " bpm";
+
+  const duration = rand(10,30);
+  status.textContent = `Playing for ${duration}s`;
+
+  const sub = subredditInput.value.trim() || "gifs";
+  const imgUrl = await fetchImage(sub);
+
+  if(imgUrl){
+    img.src = imgUrl;
+    imageBox.style.display = "block";
+  }
+
+  const interval = 60000 / bpmVal;
+  metroTimer = setInterval(clickSound, interval);
+
+  stopTimer = setTimeout(()=>{
+    clearInterval(metroTimer);
+    imageBox.style.display = "none";
+    status.textContent = "Roll again";
+    rollBtn.disabled = false;
+    locked = false;
+  }, duration*1000);
+};
 </script>
 </body>
 </html>
